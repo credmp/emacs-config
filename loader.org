@@ -1,0 +1,875 @@
+#+TITLE: Using literal programming to configure Emacs
+#+STARTUP: indent
+#+OPTIONS: H:5 num:nil tags:nil toc:nil timestamps:t
+#+LAYOUT: post
+#+DESCRIPTION: Loading emacs configuration using org-babel
+#+TAGS: emacs
+#+CATEGORIES: editing
+
+* Introduction
+
+This is my version of an configuration file for GNU Emacs. I have been using GNU Emacs since 2000 when I was introduced to it by my mentor at Personify Inc. Sadly Personify Inc was victim to the dot com bust of 2001. I have been using GNU Emacs for everything since then though.
+
+You can find the latest version of this configuration at
+https://github.com/credmp/emacs-config or at https://gitlab.com/buildfunthings/emacs-config.
+
+I modelled this set of files based off of the emacs-starter-kit at https://github.com/eschulte/emacs24-starter-kit.
+
+#+BEGIN_SRC emacs-lisp
+  (setq user-full-name "Arjen Wiersma")
+  (setq user-mail-address "arjen@wiersma.org")
+#+END_SRC
+
+* A secure Emacs environment
+
+Great article why [[https://glyph.twistedmatrix.com/2015/11/editor-malware.html][Your editor is malware]]. The following basically sets up the configuration to adhere to the articles recommondations.
+
+#+BEGIN_SRC emacs-lisp
+  ;;  (if (fboundp 'gnutls-available-p)
+  ;;      (fmakunbound 'gnutls-available-p))
+
+  (require 'cl)
+  (setq tls-checktrust t)
+
+  (let ((trustfile
+         (replace-regexp-in-string
+          "\\\\" "/"
+          (replace-regexp-in-string
+           "\n" ""
+           (shell-command-to-string "python -m certifi")))))
+    (setq tls-program
+          (list
+           (format "gnutls-cli%s --x509cafile %s -p %%p %%h"
+                   (if (eq window-system 'w32) ".exe" "") trustfile)))
+    (setq gnutls-verify-error t)
+    (setq gnutls-trustfiles (list trustfile)))
+
+  ;; Test the settings by using the following code snippet:
+  ;; (let ((bad-hosts
+  ;;        (loop for bad
+  ;;              in `("https://wrong.host.badssl.com/"
+  ;;                   "https://self-signed.badssl.com/")
+  ;;              if (condition-case e
+  ;;                     (url-retrieve
+  ;;                      bad (lambda (retrieved) t))
+  ;;                   (error nil))
+  ;;              collect bad)))
+  ;;   (if bad-hosts
+  ;;       (error (format "tls misconfigured; retrieved %s ok" bad-hosts))
+  ;;     (url-retrieve "https://badssl.com"
+  ;;                   (lambda (retrieved) t))))
+#+END_SRC
+
+
+
+* Installing use-package
+** Setup
+
+GNU Emacs has a lot of packages that make things very easy for the
+user. The package management infrastructure makes it a breeze to
+install new packages and keep up-to-date with their development.
+
+There are several package archives available for GNU Emacs:
+
+- GNU
+- Marmalade 
+- Melpa
+
+Each archive will write its files in a seperate archive directory.
+
+#+BEGIN_SRC emacs-lisp
+  (require 'package)  
+#+END_SRC
+
+Because the default setting for package-archives is to use the HTTP access to the GNU archive, I set the variable to `nil` before adding the HTTPS variants.
+
+#+name: credmp-package-infrastructure
+#+begin_src emacs-lisp
+
+  (defvar gnu '("gnu" . "https://elpa.gnu.org/packages/"))
+  (defvar melpa '("melpa" . "https://melpa.org/packages/"))
+  (defvar melpa-stable '("melpa-stable" . "https://stable.melpa.org/packages/"))
+
+  ;; Add marmalade to package repos
+  (setq package-archives nil)
+  (add-to-list 'package-archives melpa-stable t)
+  (add-to-list 'package-archives melpa t)
+  (add-to-list 'package-archives gnu t)
+#+end_src
+
+Initialize the archive and refresh the contents in case there is no cached archive.
+
+#+BEGIN_SRC emacs-lisp
+  (package-initialize)
+
+  (unless (and (file-exists-p "~/.emacs.d/elpa/archives/gnu")
+               (file-exists-p "~/.emacs.d/elpa/archives/melpa")
+               (file-exists-p "~/.emacs.d/elpa/archives/melpa-stable"))
+    (package-refresh-contents))
+#+END_SRC
+
+At each load the package list will be evaluated and any missing
+packages will be installed. The packages-install function deals with
+this check and takes care of any loading of the packages.
+
+#+name: credmp-package-installer
+#+begin_src emacs-lisp
+  (defun packages-install (&rest packages)
+    (message "running packages-install")
+    (mapc (lambda (package)
+            (let ((name (car package))
+                  (repo (cdr package)))
+              (when (not (package-installed-p name))
+                (let ((package-archives (list repo)))
+                  (package-initialize)
+                  (package-install name)))))
+          packages)
+    (package-initialize)
+    (delete-other-windows))
+#+end_src
+
+** The package
+
+#+name: credmp-package-installer
+#+begin_src emacs-lisp
+  ;; Install extensions if they're missing
+  (defun init--install-packages ()
+    (message "Lets install some packages")
+    (packages-install
+     ;; Since use-package this is the only entry here
+     ;; ALWAYS try to use use-package!
+     (cons 'use-package melpa)
+     ))
+
+  (condition-case nil
+      (init--install-packages)
+    (error
+     (package-refresh-contents)
+     (init--install-packages)))
+#+end_src
+
+
+* Moving around
+
+Bookmarks are very useful for quickly jumping around files.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package bm
+    :ensure t
+    :bind (("C-c =" . bm-toggle)
+           ("C-c [" . bm-previous)
+           ("C-c ]" . bm-next)))
+
+#+END_SRC
+
+
+#+BEGIN_SRC emacs-lisp
+  (use-package counsel :ensure t)
+
+  (use-package swiper
+    :ensure t
+    :bind*
+    (("C-s" . swiper)
+     ("C-c C-r" . ivy-resume)
+     ("M-a" . counsel-M-x)
+     ("C-x C-f" . counsel-find-file)
+     ("C-c h f" . counsel-describe-function)
+     ("C-c h v" . counsel-describe-variable)
+     ("C-c i u" . counsel-unicode-char)
+     ("M-i" . counsel-imenu)
+     ("C-c g" . counsel-git)
+     ("C-c j" . counsel-git-grep)
+     ("C-c k" . counsel-ag)
+     ("C-c l" . scounsel-locate))
+    :config
+    (progn
+      (ivy-mode 1)
+      (setq ivy-use-virtual-buffers t)
+      (define-key read-expression-map (kbd "C-r") #'counsel-expression-history)
+      (ivy-set-actions
+       'counsel-find-file
+       '(("d" (lambda (x) (delete-file (expand-file-name x)))
+          "delete"
+          )))
+      (ivy-set-actions
+       'ivy-switch-buffer
+       '(("k"
+          (lambda (x)
+            (kill-buffer x)
+            (ivy--reset-state ivy-last))
+          "kill")
+         ("j"
+          ivy--switch-buffer-other-window-action
+          "other window")))))
+#+END_SRC
+
+* Environment
+
+#+name: starter-kit-osX-workaround
+#+begin_src emacs-lisp
+  (if (or
+       (eq system-type 'darwin)
+       (eq system-type 'berkeley-unix))
+      (setq system-name (car (split-string system-name "\\."))))
+
+  (setenv "PATH" (concat "/usr/local/bin:" (getenv "PATH")))
+  (push "/usr/local/bin" exec-path)
+
+  ;; /usr/libexec/java_home
+  ;;(setenv "JAVA_HOME" "/Library/Java/JavaVirtualMachines/jdk1.8.0_05.jdk/Contents/Home")
+#+end_src
+
+** GUI
+
+- Turn off mouse interface early in startup to avoid momentary display.
+
+#+name: credmp-gui
+#+begin_src emacs-lisp
+  (menu-bar-mode 1)
+  (tool-bar-mode -1)
+  (scroll-bar-mode -1)
+#+end_src
+
+- change command to meta, and ignore option to use weird Norwegian
+keyboard
+
+#+name: credmp-keys
+#+begin_src emacs-lisp
+  (setq mac-option-modifier 'none)
+  (setq mac-command-modifier 'meta)
+  (setq ns-function-modifier 'hyper)
+#+end_src
+
+- Move to trash when deleting stuff and write backup files to own directory
+
+#+name: credmp-trash
+#+begin_src emacs-lisp
+  ;; Backup settings
+  (defvar --backup-directory (concat init-dir "backups"))
+
+  (if (not (file-exists-p --backup-directory))
+      (make-directory --backup-directory t))
+
+  (setq backup-directory-alist `(("." . ,--backup-directory)))
+  (setq make-backup-files t               ; backup of a file the first time it is saved.
+        backup-by-copying t               ; don't clobber symlinks
+        version-control t                 ; version numbers for backup files
+        delete-old-versions t             ; delete excess backup files silently
+        delete-by-moving-to-trash t
+        kept-old-versions 6               ; oldest versions to keep when a new numbered backup is made (default: 2)
+        kept-new-versions 9               ; newest versions to keep when a new numbered backup is made (default: 2)
+        auto-save-default t               ; auto-save every buffer that visits a file
+        auto-save-timeout 20              ; number of seconds idle time before auto-save (default: 30)
+        auto-save-interval 200            ; number of keystrokes between auto-saves (default: 300)
+        )
+    (setq delete-by-moving-to-trash t
+          trash-directory "~/.Trash/emacs")
+
+    (setq backup-directory-alist `(("." . ,(expand-file-name
+                                            (concat init-dir "backups")))))
+#+end_src
+
+- Don't open files from the workspace in a new frame
+
+#+name: credmp-trash
+#+begin_src emacs-lisp
+  (setq ns-pop-up-frames nil)
+#+end_src
+
+- Use aspell for spell checking: brew install aspell --lang=en
+
+#+name: credmp-spell
+#+begin_src emacs-lisp
+  ;; Emacs 25-rc1 hunspell/ispell seems broken, to investigate!
+  ;; (when (executable-find "hunspell")
+  ;;   (setq-default ispell-program-name "hunspell")
+  ;;   (setq ispell-really-hunspell t))
+
+
+  ;; (setq ispell-program-name "aspell"
+  ;;       ispell-extra-args '("--sug-mode=ultra"))
+
+    ;;; ispell to dutch
+  ;;  (global-set-key (kbd "C-c N")
+  ;;                  (lambda ()
+  ;;                    (interactive)
+  ;;                    (ispell-change-dictionary "nederlands")
+  ;;                    (flyspell-buffer)))
+#+end_src
+
+- Find out what face is used, so you can customize it :)
+
+#+name: credmp-spell
+#+begin_src emacs-lisp
+  ;;; what-face to determine the face at the current point
+  (defun what-face (pos)
+    (interactive "d")
+    (let ((face (or (get-char-property (point) 'read-face-name)
+                    (get-char-property (point) 'face))))
+      (if face (message "Face: %s" face) (message "No face at %d" pos))))
+#+end_src
+
+- Windows management
+
+#+name: credmp-window
+#+begin_src emacs-lisp
+  (use-package ace-window
+    :ensure t
+    :config
+    (global-set-key (kbd "C-c p") 'ace-window))
+
+  (use-package ace-jump-mode
+    :ensure t
+    :config
+    (define-key global-map (kbd "C-c SPC") 'ace-jump-mode))
+#+end_src
+
+- Misc stuff
+
+#+name: credmp-spell
+#+begin_src emacs-lisp
+  ;; Custom binding for magit-status
+  (use-package magit
+    :config
+    (global-set-key (kbd "C-c m") 'magit-status))
+
+  (setq inhibit-startup-message t)
+  (global-linum-mode)
+
+  (defun iwb ()
+    "indent whole buffer"
+    (interactive)
+    (delete-trailing-whitespace)
+    (indent-region (point-min) (point-max) nil)
+    (untabify (point-min) (point-max)))
+
+  (global-set-key (kbd "C-c n") 'iwb)
+
+  (electric-pair-mode t)
+
+#+end_src
+
+
+
+** Enhancements
+
+#+BEGIN_SRC emacs-lisp
+  (use-package ivy
+    :ensure t
+    :diminish ivy-mode
+    :config
+    (defun couns-git ()
+      "Find file in the current Git repository."
+      (interactive)
+      (let* ((default-directory (locate-dominating-file
+                                 default-directory ".git"))
+             (cands (split-string
+                     (shell-command-to-string
+                      "git ls-files --full-name --")
+                     "\n"))
+             (file (ivy-read "Find file: " cands)))
+        (when file
+          (find-file file))))
+    :bind ("M-o" . couns-git)
+    )
+
+  (use-package swiper
+    :ensure t)
+
+  (use-package counsel
+    :ensure t)
+#+END_SRC
+
+* Look and feel
+
+#+name: credmp-package-installer
+#+begin_src emacs-lisp
+  
+(use-package arjen-grey-theme
+:ensure t
+:config
+(load-theme 'arjen-grey t))
+
+(if (eq system-type 'darwin)
+      (set-face-attribute 'default nil :font "Hack-14")
+    (set-face-attribute 'default nil :font "DejaVu Sans Mono" :height 110))
+#+end_src
+
+#+BEGIN_SRC emacs-lisp
+   (eval-after-load "org-indent" '(diminish 'org-indent-mode))
+#+END_SRC
+
+* Project mappings
+
+#+name: credmp-perspective
+#+begin_src emacs-lisp
+  ;;; Setup perspectives, or workspaces, to switch between
+  (use-package perspective
+    :ensure t
+    :config
+    ;; Enable perspective mode
+    (persp-mode t)
+    (defmacro custom-persp (name &rest body)
+      `(let ((initialize (not (gethash ,name perspectives-hash)))
+             (current-perspective persp-curr))
+         (persp-switch ,name)
+         (when initialize ,@body)
+         (setq persp-last current-perspective)))
+
+    ;; Jump to last perspective
+    (defun custom-persp-last ()
+      (interactive)
+      (persp-switch (persp-name persp-last)))
+
+    (define-key persp-mode-map (kbd "C-x p -") 'custom-persp-last)
+
+    (defun custom-persp/emacs ()
+      (interactive)
+      (custom-persp "emacs"
+                    (find-file "~/.emacs.d/init.el")))
+
+    (define-key persp-mode-map (kbd "C-x p e") 'custom-persp/emacs)
+
+    (defun custom-persp/fsc-backend ()
+      (interactive)
+      (custom-persp "backend"
+                    (find-file "/Users/arjen/Books/source/my-brain-game/project.clj")))
+
+    (define-key persp-mode-map (kbd "C-x p q") 'custom-persp/fsc-backend)
+
+    )
+
+#+end_src
+
+
+* Gnus
+
+#+BEGIN_src emacs-lisp
+  (setq gnus-select-method '(nnimap "fastmail"
+                                    (nnimap-address "mail.messagingengine.com")
+                                    (nnimap-server-port "imaps")
+                                    (nnimap-stream ssl)))
+  (setq gnus-secondary-select-methods '((nntp "news.gmane.org")
+                                        (nntp "news.xs4all.nl")))
+
+#+END_src
+
+*
+
+
+* Writing
+
+** Publishing
+
+Support to make an external call to LeanPub.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package request
+    :ensure t)
+#+END_SRC
+
+You will need the ox-leanpub library from GitHub.
+
+#+BEGIN_SRC shell :exports none
+  wget https://raw.githubusercontent.com/juanre/ox-leanpub/master/ox-leanpub.el
+#+END_SRC
+
+Now for the leanpub-export.
+
+#+BEGIN_SRC emacs-lisp  
+(add-to-list 'load-path (expand-file-name "~/.emacs.d/ox-leanpub"))
+(load-library "ox-leanpub")
+;;; http://www.lakshminp.com/publishing-book-using-org-mode
+
+(defun leanpub-export ()
+  "Export buffer to a Leanpub book."
+  (interactive)
+  (if (file-exists-p "./Book.txt")
+      (delete-file "./Book.txt"))
+  (if (file-exists-p "./Sample.txt")
+      (delete-file "./Sample.txt"))
+  (org-map-entries
+   (lambda ()
+     (let* ((level (nth 1 (org-heading-components)))
+            (tags (org-get-tags))
+            (title (or (nth 4 (org-heading-components)) ""))
+            (book-slug (org-entry-get (point) "TITLE"))
+            (filename
+             (or (org-entry-get (point) "EXPORT_FILE_NAME") (concat (replace-regexp-in-string " " "-" (downcase title)) ".md"))))
+       (when (= level 1) ;; export only first level entries
+         ;; add to Sample book if "sample" tag is found.
+         (when (or (member "sample" tags)
+                   ;;(string-prefix-p "frontmatter" filename) (string-prefix-p "mainmatter" filename)
+                   )
+           (append-to-file (concat filename "\n\n") nil "./Sample.txt"))
+         (append-to-file (concat filename "\n\n") nil "./Book.txt")
+         ;; set filename only if the property is missing
+         (or (org-entry-get (point) "EXPORT_FILE_NAME")  (org-entry-put (point) "EXPORT_FILE_NAME" filename))
+         (org-leanpub-export-to-markdown nil 1 nil)))) "-noexport")
+  (org-save-all-org-buffers)
+  nil
+  nil)
+
+(require 'request)
+
+(defun leanpub-preview ()
+  "Generate a preview of your book @ Leanpub."
+  (interactive)
+  (request
+   "https://leanpub.com/clojure-on-the-server/preview.json" ;; or better yet, get the book slug from the buffer
+   :type "POST"                                             ;; and construct the URL
+   :data '(("api_key" . ""))
+   :parser 'json-read
+   :success (function*
+             (lambda (&key data &allow-other-keys)
+               (message "Preview generation queued at leanpub.com.")))))
+#+END_SRC
+
+** Word wrapping 
+
+Please wrap text around when in text-modes. Also enable flyspell to catch nasty writing errors.
+
+#+BEGIN_SRC emacs-lisp
+  (dolist (hook '(text-mode-hook))
+    (add-hook hook (lambda ()
+                     (flyspell-mode 1)
+                     (visual-line-mode 1)
+                     )))
+#+END_SRC
+
+** Markdown support
+
+Markdown is a great way to write documentation, not as good as org-mode of course, but generally accepted as a standard.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package markdown-mode
+:ensure t)
+#+END_SRC
+
+** HTMLize buffers
+
+When exporting documents to HTML documents, such as code fragments, we need to htmlize.
+
+#+BEGIN_SRC emacs-lisp
+  (use-package htmlize
+:ensure t)
+#+END_SRC
+
+** Exports
+Export ORG code fragments with a particular theme.
+
+#+BEGIN_SRC emacs-lisp
+(defun my/with-theme (theme fn &rest args)
+  (let ((current-themes custom-enabled-themes))
+    (mapcar #'disable-theme custom-enabled-themes)
+    (load-theme theme t)
+    (let ((result (apply fn args)))
+      (mapcar #'disable-theme custom-enabled-themes)
+      (mapcar (lambda (theme) (load-theme theme t)) current-themes)
+      result)))
+
+;;(advice-add #'org-export-to-file :around (apply-partially #'my/with-theme 'arjen-grey))
+;;(advice-add #'org-export-to-buffer :around (apply-partially #'my/with-theme 'arjen-grey))
+
+#+END_SRC
+
+Enable graphing with dot and ditaa
+
+#+BEGIN_SRC emacs-lisp
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((ditaa . t)
+     (dot . t)))
+
+  (setq org-ditaa-jar-path "/usr/local/Cellar/ditaa/0.9/libexec/ditaa0_9.jar")
+  (setq org-ditaa-eps-jar-path "/usr/local/Cellar/ditaa/0.9/libexec/ditaa0_9.jar")
+
+  (setq ditaa-cmd "java -jar <path-to-ditaa>ditaa0_6b.jar")
+  (defun djcb-ditaa-generate ()
+    (interactive)
+    (shell-command
+     (concat ditaa-cmd " " buffer-file-name)))
+
+#+END_SRC
+
+
+
+* Programming
+
+** General programming
+
+As I write a lot of Lisp like code, either in GNU Emacs or in Clojure
+I like to have my environment setup for these languages. This is
+greatly supported by Paredit. [[http://danmidwood.com/content/2014/11/21/animated-paredit.html][Dan Midwood]] has a great guide to using
+paredit.
+
+The structured editing of paredit is usefull in a LOT of languages, as
+long as there are parenthesis, brackets or quotes.
+
+*** Utilities
+
+String manipulation routines for emacs lisp
+
+#+BEGIN_SRC emacs-lisp
+  (use-package s
+    :ensure t)
+#+END_SRC
+
+Hydras are the most awesome thing in the world
+
+#+BEGIN_SRC emacs-lisp
+  (use-package hydra 
+:ensure t)
+#+END_SRC
+
+*** Time Management
+
+#+BEGIN_SRC emacs-lisp
+  (defun read-wakatime-api-key ()
+    "Read the wakatime api key from .wakatime"
+    (with-temp-buffer
+      (insert-file-contents-literally "~/.wakatime")
+      (s-trim (buffer-substring-no-properties (point-min) (point-max)))))
+
+  (use-package wakatime-mode
+    :if (eq system-type 'darwin)
+    :diminish wakatime-mode
+    :ensure t
+    :config
+    (setq wakatime-api-key (read-wakatime-api-key))
+    (setq wakatime-cli-path "/usr/local/bin/wakatime")
+    (global-wakatime-mode))
+#+END_SRC
+
+*** Look and feel
+
+Enable the prettify symbols mode. It will translate (fn) to the lambda
+sign.
+
+#+BEGIN_SRC emacs-lisp
+  (global-prettify-symbols-mode 1)
+#+END_SRC
+
+*** LISP Editing
+
+#+name: credmp-lisp-editing
+#+BEGIN_SRC emacs-lisp
+  (use-package paredit
+    :ensure t
+    :diminish paredit-mode
+    :config
+    (add-hook 'emacs-lisp-mode-hook       #'enable-paredit-mode)
+    (add-hook 'eval-expression-minibuffer-setup-hook #'enable-paredit-mode)
+    (add-hook 'ielm-mode-hook             #'enable-paredit-mode)
+    (add-hook 'lisp-mode-hook             #'enable-paredit-mode)
+    (add-hook 'lisp-interaction-mode-hook #'enable-paredit-mode)
+    (add-hook 'scheme-mode-hook           #'enable-paredit-mode)
+;;    (add-hook 'prog-mode-hook #'paredit-everywhere-mode)
+    )
+
+  (use-package highlight-parentheses
+    :ensure t
+    :diminish highlight-parentheses-mode
+    :config
+    (add-hook 'emacs-lisp-mode-hook
+              (lambda()
+                (highlight-parentheses-mode)
+                )))
+
+  (use-package rainbow-delimiters
+    :ensure t
+    :config
+    (add-hook 'emacs-lisp-mode-hook
+              (lambda()
+                (rainbow-delimiters-mode)
+                )))
+
+  (global-highlight-parentheses-mode)
+#+END_SRC
+
+*** Snippets
+
+#+BEGIN_SRC emacs-lisp
+  (use-package yasnippet
+    :ensure t
+    :diminish yas
+    :config
+    (yas/global-mode 1)
+    (add-to-list 'yas-snippet-dirs "~/.emacs.d/snippets"))
+#+END_SRC
+
+*** Auto completion
+
+#+BEGIN_SRC emacs-lisp
+  (use-package company
+    :ensure t
+    :bind (("C-c /". company-complete))
+    :config
+    (global-company-mode)
+    )
+#+END_SRC
+
+*** Version Control
+Magit is the only thing you need when it comes to Version Control (Git)
+
+#+BEGIN_SRC emacs-lisp
+  (use-package magit
+    :ensure t
+    :bind (("C-c m" . magit-status))
+    ;; Custom binding for magit-status
+    ;;(global-set-key (kbd "C-c m") 'magit-status)
+    )
+#+END_SRC
+
+*** REST support
+
+#+BEGIN_SRC emacs-lisp
+  (use-package restclient
+    :ensure t)
+#+END_SRC
+
+** Clojure
+
+The clojure ecosystem for GNU Emacs consists out of CIDER and bunch of
+supporting modules.
+
+*** CIDER
+
+#+name: credmp-clojure
+#+begin_src emacs-lisp
+  (use-package cider
+    :ensure t
+    :pin melpa-stable
+
+    :config
+    (add-hook 'cider-repl-mode-hook #'company-mode)
+    (add-hook 'cider-mode-hook #'company-mode)
+    (add-hook 'cider-mode-hook #'eldoc-mode)
+    (add-hook 'cider-mode-hook #'cider-hydra-mode)
+    (add-hook 'clojure-mode-hook #'paredit-mode)
+    (setq cider-repl-use-pretty-printing t)
+    (setq cider-repl-display-help-banner nil)
+    (setq cider-cljs-lein-repl "(do (use 'figwheel-sidecar.repl-api) (start-figwheel!) (cljs-repl))")
+    
+    :bind (("M-r" . cider-namespace-refresh)
+           ("C-c r" . cider-repl-reset)
+           ("C-c ." . cider-reset-test-run-tests))
+    )
+
+  (use-package clj-refactor
+    :ensure t
+    :config
+    (add-hook 'clojure-mode-hook (lambda ()
+                                   (clj-refactor-mode 1)
+                                   ;; insert keybinding setup here
+                                   ))
+    (cljr-add-keybindings-with-prefix "C-c C-m")
+    (setq cljr-warn-on-evaql nil)
+    :bind ("C-c '" . hydra-cljr-help-menu/body)
+  )
+#+end_src
+
+**** TODO Cider Support Functions
+
+Some support functions to help with the connection between the buffer
+and the REPL. Big caveat you need to fix here is the hard-coded
+cider-repl-reset, which should be project specific.
+
+!TODO! fix this.
+
+#+BEGIN_SRC emacs-lisp
+  (defun cider-repl-command (cmd)
+    "Execute commands on the cider repl"
+    (cider-switch-to-repl-buffer)
+    (goto-char (point-max))
+    (insert cmd)
+    (cider-repl-return)
+    (cider-switch-to-last-clojure-buffer))
+
+  (defun cider-repl-reset ()
+    "Assumes reloaded + tools.namespace is used to reload everything"
+    (interactive)
+    (save-some-buffers)
+    (cider-repl-command "(my-brain-game.core/reset)"))
+
+  (defun cider-reset-test-run-tests ()
+    (interactive)
+    (cider-repl-reset)
+    (cider-test-run-project-tests))
+#+END_SRC
+
+*** Hydras
+
+Retrieve the Cider-Hydra package from [[https://github.com/clojure-emacs/cider-hydra/blob/master/cider-hydra.el][GitHub]].
+
+#+BEGIN_SRC shell :exports none
+  wget https://raw.githubusercontent.com/clojure-emacs/cider-hydra/master/cider-hydra.el
+#+END_SRC
+
+
+#+BEGIN_SRC emacs-lisp
+  (load-library "~/.emacs.d/cider-hydra.el")
+  (require 'cider-hydra)
+#+END_SRC
+
+** Web editing
+
+The web-mode is particularily good for editing HTML and JS files.
+
+#+name: credmp-package-web
+#+begin_src emacs-lisp
+  (use-package web-mode
+    :ensure t
+    :config
+    (add-to-list 'auto-mode-alist '("\\.phtml\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.tpl\\.php\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.jsp\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.as[cp]x\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.erb\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.mustache\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.djhtml\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
+    (add-to-list 'auto-mode-alist '("\\.xhtml?\\'" . web-mode))
+
+    (add-hook 'sgml-mode-hook 'zencoding-mode)
+    (global-set-key (kbd "C-j") 'zencoding-expand-line)
+
+    (add-hook 'js-mode-hook (lambda () (tern-mode t)))
+    ;; (eval-after-load 'tern
+    ;;    '(progn
+    ;;       (require 'tern-auto-complete)
+    ;;       (tern-ac-setup)))
+
+    (defun my-web-mode-hook ()
+      "Hooks for Web mode."
+      (setq web-mode-markup-indent-offset 2)
+      )
+    (add-hook 'web-mode-hook  'my-web-mode-hook))
+
+  (use-package less-css-mode
+    :ensure t)
+
+  (use-package zencoding-mode
+    :ensure t)
+#+end_src
+
+
+* Experiments
+
+The following are snippets, functions or other temporary code that I have found or created but that do not have a solid place in my workflow yet.
+
+#+BEGIN_SRC emacs-lisp
+  ;; helper functions
+
+
+(defun nuke-all-buffers ()
+  (interactive)
+  (mapcar 'kill-buffer (buffer-list))
+  (delete-other-windows))
+
+(setq mac-right-alternate-modifier nil)
+
+;; Experiments
+
+#+END_SRC
+
