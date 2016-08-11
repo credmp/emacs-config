@@ -449,12 +449,8 @@ keyboard
                                     (nnimap-address "mail.messagingengine.com")
                                     (nnimap-server-port "imaps")
                                     (nnimap-stream ssl)))
-  (setq gnus-secondary-select-methods '((nntp "news.gmane.org")
-                                        (nntp "news.xs4all.nl")))
-
+  (setq gnus-secondary-select-methods '((nntp "news.xs4all.nl")))
 #+END_src
-
-*
 
 
 * Writing
