@@ -539,7 +539,7 @@ Markdown is a great way to write documentation, not as good as org-mode of cours
 
 #+BEGIN_SRC emacs-lisp
   (use-package markdown-mode
-:ensure t)
+    :ensure t)
 #+END_SRC
 
 ** HTMLize buffers
@@ -548,7 +548,7 @@ When exporting documents to HTML documents, such as code fragments, we need to h
 
 #+BEGIN_SRC emacs-lisp
   (use-package htmlize
-:ensure t)
+    :ensure t)
 #+END_SRC
 
 ** Exports
@@ -611,11 +611,11 @@ String manipulation routines for emacs lisp
     :ensure t)
 #+END_SRC
 
-Hydras are the most awesome thing in the world
+Hydras are the most awesome thing in the world. Check out [[https://github.com/abo-abo/hydra][the project page]] for some great examples.
 
 #+BEGIN_SRC emacs-lisp
-  (use-package hydra 
-:ensure t)
+  (use-package hydra
+    :ensure t)
 #+END_SRC
 
 *** Time Management
@@ -660,8 +660,14 @@ sign.
     (add-hook 'lisp-mode-hook             #'enable-paredit-mode)
     (add-hook 'lisp-interaction-mode-hook #'enable-paredit-mode)
     (add-hook 'scheme-mode-hook           #'enable-paredit-mode)
-;;    (add-hook 'prog-mode-hook #'paredit-everywhere-mode)
     )
+
+  ;; Ensure paredit is used EVERYWHERE!
+  (use-package paredit-everywhere
+    :ensure t
+    :diminish paredit-everywhere-mode
+    :config
+    (add-hook 'prog-mode-hook #'paredit-everywhere-mode))
 
   (use-package highlight-parentheses
     :ensure t
@@ -675,7 +681,7 @@ sign.
   (use-package rainbow-delimiters
     :ensure t
     :config
-    (add-hook 'emacs-lisp-mode-hook
+    (add-hook 'lisp-mode-hook
               (lambda()
                 (rainbow-delimiters-mode)
                 )))
@@ -711,10 +717,7 @@ Magit is the only thing you need when it comes to Version Control (Git)
 #+BEGIN_SRC emacs-lisp
   (use-package magit
     :ensure t
-    :bind (("C-c m" . magit-status))
-    ;; Custom binding for magit-status
-    ;;(global-set-key (kbd "C-c m") 'magit-status)
-    )
+    :bind (("C-c m" . magit-status)))
 #+END_SRC
 
 *** REST support
@@ -827,26 +830,20 @@ The web-mode is particularily good for editing HTML and JS files.
     (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
     (add-to-list 'auto-mode-alist '("\\.xhtml?\\'" . web-mode))
 
-    (add-hook 'sgml-mode-hook 'zencoding-mode)
-    (global-set-key (kbd "C-j") 'zencoding-expand-line)
-
-    (add-hook 'js-mode-hook (lambda () (tern-mode t)))
-    ;; (eval-after-load 'tern
-    ;;    '(progn
-    ;;       (require 'tern-auto-complete)
-    ;;       (tern-ac-setup)))
-
     (defun my-web-mode-hook ()
       "Hooks for Web mode."
-      (setq web-mode-markup-indent-offset 2)
-      )
+      (setq web-mode-markup-indent-offset 2))
+
     (add-hook 'web-mode-hook  'my-web-mode-hook))
 
   (use-package less-css-mode
     :ensure t)
 
   (use-package zencoding-mode
-    :ensure t)
+    :ensure t
+    :bind ("C-j" . zencoding-expand-line)
+    :config
+    (add-hook 'sgml-mode-hook 'zencoding-mode))
 #+end_src
 
 

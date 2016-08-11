@@ -1,0 +1,3 @@
+[submodule "ox-leanpub"]
+	path = ox-leanpub
+	url = https://github.com/juanre/ox-leanpub.git
