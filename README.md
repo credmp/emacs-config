@@ -7,3 +7,15 @@ over.
 This version uses literal programming with org-babel.
 
 It is heavely influenced by [Sacha Chua's configuration](http://pages.sachachua.com/.emacs.d/Sacha.html)
+
+## Setup
+
+```
+~ $ git clone git@gitlab.com:buildfunthings/emacs-config.git .emacs.d
+~/.emacs.d $ git submodule init
+~/.emacs.d $ git submodule update
+```
+
+When you start GNU Emacs it will start downloading all the required packages. It might take some time, depending on your internet connection and machine.
+
+Afterwards, restart GNU Emacs and it will load up very speedy.
