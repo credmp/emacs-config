@@ -1,4 +1,4 @@
-#+TITLE: Using literal programming to configure Emacs
+#+TITLE: My GNU Emacs configuration
 #+STARTUP: indent
 #+OPTIONS: H:5 num:nil tags:nil toc:nil timestamps:t
 #+LAYOUT: post
@@ -19,6 +19,7 @@ I modelled this set of files based off of the emacs-starter-kit at https://githu
   (setq user-full-name "Arjen Wiersma")
   (setq user-mail-address "arjen@wiersma.org")
 #+END_SRC
+
 
 * A secure Emacs environment
 
@@ -45,19 +46,19 @@ Great article why [[https://glyph.twistedmatrix.com/2015/11/editor-malware.html]
     (setq gnutls-trustfiles (list trustfile)))
 
   ;; Test the settings by using the following code snippet:
-  ;; (let ((bad-hosts
-  ;;        (loop for bad
-  ;;              in `("https://wrong.host.badssl.com/"
-  ;;                   "https://self-signed.badssl.com/")
-  ;;              if (condition-case e
-  ;;                     (url-retrieve
-  ;;                      bad (lambda (retrieved) t))
-  ;;                   (error nil))
-  ;;              collect bad)))
-  ;;   (if bad-hosts
-  ;;       (error (format "tls misconfigured; retrieved %s ok" bad-hosts))
-  ;;     (url-retrieve "https://badssl.com"
-  ;;                   (lambda (retrieved) t))))
+  ;;  (let ((bad-hosts
+  ;;         (loop for bad
+  ;;               in `("https://wrong.host.badssl.com/"
+  ;;                    "https://self-signed.badssl.com/")
+  ;;               if (condition-case e
+  ;;                      (url-retrieve
+  ;;                       bad (lambda (retrieved) t))
+  ;;                    (error nil))
+  ;;               collect bad)))
+  ;;    (if bad-hosts
+  ;;        (error (format "tls misconfigured; retrieved %s ok" bad-hosts))
+  ;;      (url-retrieve "https://badssl.com"
+  ;;                    (lambda (retrieved) t))))
 #+END_SRC
 
 
@@ -201,6 +202,16 @@ Bookmarks are very useful for quickly jumping around files.
          ("j"
           ivy--switch-buffer-other-window-action
           "other window")))))
+#+END_SRC
+
+
+* Discoverability
+
+#+BEGIN_SRC emacs-lisp
+  (use-package which-key
+    :ensure t
+    :config
+    (which-key-mode))
 #+END_SRC
 
 * Environment
@@ -380,6 +391,7 @@ keyboard
     :ensure t)
 #+END_SRC
 
+
 * Look and feel
 
 #+name: credmp-package-installer
@@ -398,6 +410,7 @@ keyboard
 #+BEGIN_SRC emacs-lisp
    (eval-after-load "org-indent" '(diminish 'org-indent-mode))
 #+END_SRC
+
 
 * Project mappings
 
@@ -440,17 +453,6 @@ keyboard
     )
 
 #+end_src
-
-
-* Gnus
-
-#+BEGIN_src emacs-lisp
-  (setq gnus-select-method '(nnimap "fastmail"
-                                    (nnimap-address "mail.messagingengine.com")
-                                    (nnimap-server-port "imaps")
-                                    (nnimap-stream ssl)))
-  (setq gnus-secondary-select-methods '((nntp "news.xs4all.nl")))
-#+END_src
 
 
 * Writing
@@ -839,11 +841,8 @@ The web-mode is particularily good for editing HTML and JS files.
   (use-package less-css-mode
     :ensure t)
 
-  (use-package zencoding-mode
-    :ensure t
-    :bind ("C-j" . zencoding-expand-line)
-    :config
-    (add-hook 'sgml-mode-hook 'zencoding-mode))
+  (use-package emmet-mode
+    :ensure t)
 #+end_src
 
 
