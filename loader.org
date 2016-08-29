@@ -73,13 +73,13 @@ install new packages and keep up-to-date with their development.
 There are several package archives available for GNU Emacs:
 
 - GNU
-- Marmalade 
+- Marmalade
 - Melpa
 
 Each archive will write its files in a seperate archive directory.
 
 #+BEGIN_SRC emacs-lisp
-  (require 'package)  
+  (require 'package)
 #+END_SRC
 
 Because the default setting for package-archives is to use the HTTP access to the GNU archive, I set the variable to `nil` before adding the HTTPS variants.
@@ -287,25 +287,31 @@ keyboard
   (setq ns-pop-up-frames nil)
 #+end_src
 
-- Use aspell for spell checking: brew install aspell --lang=en
+[[https://www.emacswiki.org/emacs/InteractiveSpell][Spellchecking in Emacs]]. Hunspell is widely used in text editor and even as the source of the spell check in MacOS X.
+
+Install using the Homebrew project:
+
+#+BEGIN_SRC shell :exports none
+  brew install hunspell
+#+END_SRC
+
+Install dictionaries from the [[https://addons.mozilla.org/en-us/firefox/language-tools/][Mozilla Add-on page]].
 
 #+name: credmp-spell
 #+begin_src emacs-lisp
-  ;; Emacs 25-rc1 hunspell/ispell seems broken, to investigate!
-  ;; (when (executable-find "hunspell")
-  ;;   (setq-default ispell-program-name "hunspell")
-  ;;   (setq ispell-really-hunspell t))
-
+  (when (executable-find "hunspell")
+    (setq-default ispell-program-name "hunspell")
+    (setq ispell-really-hunspell t))
 
   ;; (setq ispell-program-name "aspell"
   ;;       ispell-extra-args '("--sug-mode=ultra"))
 
-    ;;; ispell to dutch
-  ;;  (global-set-key (kbd "C-c N")
-  ;;                  (lambda ()
-  ;;                    (interactive)
-  ;;                    (ispell-change-dictionary "nederlands")
-  ;;                    (flyspell-buffer)))
+  ;;; ispell to American
+  (global-set-key (kbd "C-c N")
+                  (lambda ()
+                    (interactive)
+                    (ispell-change-dictionary "american")
+                    (flyspell-buffer)))
 #+end_src
 
 - Find out what face is used, so you can customize it :)
@@ -396,7 +402,7 @@ keyboard
 
 #+name: credmp-package-installer
 #+begin_src emacs-lisp
-  
+
 (use-package arjen-grey-theme
 :ensure t
 :config
@@ -474,7 +480,7 @@ You will need the ox-leanpub library from GitHub.
 
 Now for the leanpub-export.
 
-#+BEGIN_SRC emacs-lisp  
+#+BEGIN_SRC emacs-lisp
 (add-to-list 'load-path (expand-file-name "~/.emacs.d/ox-leanpub"))
 (load-library "ox-leanpub")
 ;;; http://www.lakshminp.com/publishing-book-using-org-mode
@@ -523,7 +529,7 @@ Now for the leanpub-export.
                (message "Preview generation queued at leanpub.com.")))))
 #+END_SRC
 
-** Word wrapping 
+** Word wrapping
 
 Please wrap text around when in text-modes. Also enable flyspell to catch nasty writing errors.
 
@@ -618,6 +624,45 @@ Hydras are the most awesome thing in the world. Check out [[https://github.com/a
 #+BEGIN_SRC emacs-lisp
   (use-package hydra
     :ensure t)
+#+END_SRC
+
+*** Code Folding
+
+#+BEGIN_SRC emacs-lisp
+  (use-package hideshow
+    :ensure t
+    :bind (("C->" . my-toggle-hideshow-all)
+           ("C-<" . hs-hide-level)
+           ("C-;" . hs-toggle-hiding))
+    :config
+    ;; Hide the comments too when you do a 'hs-hide-all'
+    (setq hs-hide-comments nil)
+    ;; Set whether isearch opens folded comments, code, or both
+    ;; where x is code, comments, t (both), or nil (neither)
+    (setq hs-isearch-open 'x)
+    ;; Add more here
+
+
+    (setq hs-set-up-overlay
+          (defun my-display-code-line-counts (ov)
+            (when (eq 'code (overlay-get ov 'hs))
+              (overlay-put ov 'display
+                           (propertize
+                            (format " ... <%d>"
+                                    (count-lines (overlay-start ov)
+                                                 (overlay-end ov)))
+                            'face 'font-lock-type-face)))))
+
+    (defvar my-hs-hide nil "Current state of hideshow for toggling all.")
+       ;;;###autoload
+    (defun my-toggle-hideshow-all () "Toggle hideshow all."
+           (interactive)
+           (setq my-hs-hide (not my-hs-hide))
+           (if my-hs-hide
+               (hs-hide-all)
+             (hs-show-all)))
+
+    (hs-minor-mode 1))
 #+END_SRC
 
 *** Time Management
@@ -729,6 +774,7 @@ Magit is the only thing you need when it comes to Version Control (Git)
     :ensure t)
 #+END_SRC
 
+
 ** Clojure
 
 The clojure ecosystem for GNU Emacs consists out of CIDER and bunch of
@@ -751,7 +797,7 @@ supporting modules.
     (setq cider-repl-use-pretty-printing t)
     (setq cider-repl-display-help-banner nil)
     (setq cider-cljs-lein-repl "(do (use 'figwheel-sidecar.repl-api) (start-figwheel!) (cljs-repl))")
-    
+
     :bind (("M-r" . cider-namespace-refresh)
            ("C-c r" . cider-repl-reset)
            ("C-c ." . cider-reset-test-run-tests))
@@ -846,6 +892,29 @@ The web-mode is particularily good for editing HTML and JS files.
 #+end_src
 
 
+* Blogging
+
+To write articles on the BuildFunThings site I use org-mode. I then publish them using [[https://github.com/punchagan/org2blog][org2blog package]].
+
+#+BEGIN_SRC emacs-lisp
+  (use-package org2blog
+    :ensure t
+    :config
+    ;; Experiments
+    (require 'auth-source) ;; or nothing if already in the load-path
+
+    (let (credentials)
+      ;; only required if your auth file is not already in the list of auth-sources
+      ;; Always keep config and username/password separated
+      (add-to-list 'auth-sources "~/.authinfo")
+      (setq credentials (auth-source-user-and-password "buildfunthings.com"))
+      (setq org2blog/wp-blog-alist
+            `(("bft"
+               :url "https://www.buildfunthings.com/xmlrpc.php"
+               :username ,(car credentials)
+               :password ,(cadr credentials))))))
+#+END_SRC
+
 * Experiments
 
 The following are snippets, functions or other temporary code that I have found or created but that do not have a solid place in my workflow yet.
@@ -864,4 +933,3 @@ The following are snippets, functions or other temporary code that I have found 
 ;; Experiments
 
 #+END_SRC
-
