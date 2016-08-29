@@ -205,7 +205,7 @@ Bookmarks are very useful for quickly jumping around files.
 #+END_SRC
 
 
-* Discoverability
+* Discover-ability
 
 #+BEGIN_SRC emacs-lisp
   (use-package which-key
@@ -299,19 +299,20 @@ Install dictionaries from the [[https://addons.mozilla.org/en-us/firefox/languag
 
 #+name: credmp-spell
 #+begin_src emacs-lisp
-  (when (executable-find "hunspell")
-    (setq-default ispell-program-name "hunspell")
-    (setq ispell-really-hunspell t))
+  (defun spell-buffer-dutch ()
+    (interactive)
+    (ispell-change-dictionary "en")
+    (flyspell-buffer))
 
-  ;; (setq ispell-program-name "aspell"
-  ;;       ispell-extra-args '("--sug-mode=ultra"))
+  (use-package ispell
+    :config
+    (when (executable-find "hunspell")
+      (setq-default ispell-program-name "hunspell")
+      (setq ispell-really-hunspell t))
 
-  ;;; ispell to American
-  (global-set-key (kbd "C-c N")
-                  (lambda ()
-                    (interactive)
-                    (ispell-change-dictionary "american")
-                    (flyspell-buffer)))
+    ;; (setq ispell-program-name "aspell"
+    ;;       ispell-extra-args '("--sug-mode=ultra"))
+    :bind ("C-c N" . spell-buffer-dutch))
 #+end_src
 
 - Find out what face is used, so you can customize it :)
