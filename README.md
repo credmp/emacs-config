@@ -1,3 +1,7 @@
+# Deprecated
+
+Please see the repo on [Gitlab](https://gitlab.com/buildfunthings/emacs-config)
+
 # Emacs Config
 
 This is my emacs configuration. It was crafted from 2000 until
