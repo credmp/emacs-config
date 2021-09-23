@@ -1,6 +1,4 @@
-# Deprecated
-
-I have started using [Doom Emacs](https://github.com/hlissner/doom-emacs) and as a result have a completely new configuration. This is left here as an archive.
+This repository has moved to: https://gitlab.com/buildfunthings/emacs-config
 
 # Emacs Config
 
